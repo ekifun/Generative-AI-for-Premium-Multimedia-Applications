@@ -12,10 +12,17 @@
     <h1>Processing Topics</h1>
     <ul id="processing-topics"></ul>
 
+    <!-- Add a form for submitting new topics -->
+    <h1>Submit New Frame Upscaling Task</h1>
+    <form id="submit-task-form">
+        <input type="text" id="topic-name" placeholder="Enter video file name" required>
+        <button type="submit">Submit</button>
+    </form>
+
     <script>
         // Function to fetch processed and processing topics from the server
         function fetchTopics() {
-            fetch('/topics')
+            fetch('http://127.0.0.1:5001/topics')
                 .then(response => response.json())
                 .then(data => {
                     const processedTopics = document.getElementById('processed-topics');
@@ -27,13 +34,15 @@
 
                     // Render processed topics
                     data.processed.forEach(topic => {
+                        console.log(`processed topic: ${topic}`);
                         const li = document.createElement('li');
-                        li.textContent = topic;
+                        li.textContent = topic.name;
                         processedTopics.appendChild(li);
                     });
 
                     // Render processing topics with progress
                     data.processing.forEach(topic => {
+                        console.log(`processing topic: ${topic}`);
                         const li = document.createElement('li');
                         li.textContent = `${topic.name} - Progress: ${topic.progress}%`;
                         processingTopics.appendChild(li);
@@ -46,6 +55,32 @@
 
         // Initial fetch when the page loads
         window.onload = fetchTopics;
+
+        // Handle form submission
+        document.getElementById('submit-task-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const topicName = document.getElementById('topic-name').value;
+
+            // Send the topic name to the backend
+            fetch('http://127.0.0.1:3000/submit-task', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ topicName }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Task submitted successfully:', data);
+            })
+            .catch(error => {
+                console.error('Error submitting task:', error);
+            });
+
+            // Clear the input field
+            document.getElementById('topic-name').value = '';
+        });
     </script>
 </body>
 </html>
