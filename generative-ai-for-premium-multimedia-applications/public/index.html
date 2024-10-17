@@ -22,7 +22,7 @@
     <script>
         // Function to fetch processed and processing topics from the server
         function fetchTopics() {
-            fetch('http://127.0.0.1:5001/topics')
+            fetch('http://localhost:8080/get-status')
                 .then(response => response.json())
                 .then(data => {
                     const processedTopics = document.getElementById('processed-topics');
@@ -63,7 +63,7 @@
             const topicName = document.getElementById('topic-name').value;
 
             // Send the topic name to the backend
-            fetch('http://127.0.0.1:3000/submit-task', {
+            fetch('http://localhost:8080/submit-topic', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -77,6 +77,7 @@
             .catch(error => {
                 console.error('Error submitting task:', error);
             });
+
 
             // Clear the input field
             document.getElementById('topic-name').value = '';

@@ -47,7 +47,7 @@ const submitTask = async (topicName) => {
 };
 
 // 
-app.post('/submit-task', async (req, res) => {
+app.post('/submit-topic', async (req, res) => {
     const { topicName } = req.body;
     console.log(`API to accept user submitted tasks topicName: ${topicName}`);
     

@@ -148,7 +148,7 @@ const runConsumer = async () => {
 };
 
 // Retrieve stored topics from Redis and serve to the frontend
-app.get('/topics', async (req, res) => {
+app.get('/get-status', async (req, res) => {
     const { processed, processing } = await getTopicsFromRedis();
     res.json({ processed, processing }); // Send the topics as JSON to the frontend
 });
