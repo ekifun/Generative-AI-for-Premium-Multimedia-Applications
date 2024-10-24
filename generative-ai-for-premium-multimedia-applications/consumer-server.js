@@ -3,7 +3,7 @@ const cors = require('cors');
 const { Kafka } = require('kafkajs');
 const axios = require('axios');
 const path = require('path');
-const redis = require('redis'); // Import Redis
+const redis = require('redis');
 
 const app = express();
 const PORT = 5001;
@@ -15,7 +15,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
 
 // URL of the microservice model server
-const ESRGANServerUrl = 'http://127.0.0.1:5000'; // Update with the actual URL of the model server
+const ESRGANServerUrl = 'http://127.0.0.1:8080'; // Update with the actual URL of the model server
 
 // Initialize Kafka client and topics
 const kafka = new Kafka({
@@ -23,11 +23,16 @@ const kafka = new Kafka({
     brokers: ['127.0.0.1:9092'] // Replace with your Kafka broker address
 });
 
-const producer = kafka.producer();
+// Kafka consumer setup
 const consumer = kafka.consumer({ groupId: 'transcoding-group' });
 
-// Initialize Redis client
+// Redis client setup
 const redisClient = redis.createClient();
+const pubSubClient = redisClient.duplicate(); // Duplicate Redis client for Pub/Sub
+
+const PROCESSING_TOPICS_KEY = 'processingTopics';
+const PROCESSED_TOPICS_KEY = 'processedTopics';
+const PUB_SUB_CHANNEL = 'task_completed';
 
 redisClient.on('error', (err) => {
     console.error('Redis error:', err);
@@ -43,61 +48,16 @@ redisClient.connect()
     process.exit(1); // Optionally terminate the process if Redis connection is essential
 });
 
-// Redis keys for storing topics
-const PROCESSED_TOPICS_KEY = 'processedTopics';
-const PROCESSING_TOPICS_KEY = 'processingTopics';
-// Function to check topic status
-async function queryTopicStatus(topic, topic_id, retryCount = 0) {
-    const MAX_RETRIES = 5;
-    const RETRY_DELAY = Math.min(10000 * (retryCount + 1), 60000); // Exponential backoff with a cap at 60 seconds
-    try {
-        console.log(`Send request to get the status of topic: ${topic}`);
-        const response = await axios.get(`${ESRGANServerUrl}/get_topic/${topic_id}`);
-        console.log(`Get the AI modle processing status: ${response.data.status}`);
-        if (response.data.status === 'processed') {
-            console.log(`Topic ${topic} has been processed. Closing the topic.`);
-            await closeTopic(topic, topic_id);
-        } else {
-            console.log(`Topic: ${topic} is still processing. Retrying in 10 seconds.`);
-            setTimeout(() => queryTopicStatus(topic, topic_id), RETRY_DELAY);
-        }
-    } catch (error) {
-        console.error(`Error querying topic status for ${topic}: `, error);
-        if (retryCount < MAX_RETRIES) {
-            console.log(`Retrying... Attempt ${retryCount + 1}`);
-            setTimeout(() => queryTopicStatus(topic, topic_id, retryCount + 1), RETRY_DELAY);
-        } else {
-            console.error(`Max retries reached. Close topic ${topic_id} because of error`);
-        }
-    }
-}
-
 // Helper function to get the current state of topics from Redis (processed and processing)
 async function getTopicsFromRedis() {
     const processed = await redisClient.lRange(PROCESSED_TOPICS_KEY, 0, -1);
     const processing = await redisClient.hGetAll(PROCESSING_TOPICS_KEY);
     console.log(`getTopicsFromRedis`);
+
     return {
         processed: processed.map(topic => ({ name: topic })), // Convert processed topics into an object array
         processing: Object.keys(processing).map(key => ({ name: key, progress: processing[key] })) // Convert processing topics with progress
     };
-}
-
-// Function to close a topic after it's processed
-async function closeTopic(topic, topic_id) {
-    try {
-        const response = await axios.post(`${ESRGANServerUrl}/close_topic/${topic_id}`, { topic_id });
-        console.log(`Close the topic: ${topic} response.status: ${response.status}`);
-        if (response.status === 200) {
-            console.log(`Topic: ${topic} successfully closed.`);
-            await redisClient.hDel(PROCESSING_TOPICS_KEY, topic); // Remove from processing
-            await redisClient.rPush(PROCESSED_TOPICS_KEY, topic); // Add to processed list
-        } else {
-            console.error(`Failed to close topic: ${topic}`);
-        }
-    } catch (error) {
-        console.error(`Error closing topic: ${topic}: `, error);
-    }
 }
 
 // Simulating topic processing
@@ -107,24 +67,18 @@ async function processTopic(topic) {
     console.log(`Consumer consumes a topic: ${topic}`);
 
     try {
-        // Send a request to create a new topic/task on the model server
+        // Send a request to create a new task of super-resolution using generative AI model
         console.log(`Sending POST request to ESRGAN AI model to create a new topic: ${topic}`);
         const response = await axios.post(`${ESRGANServerUrl}/create_topic`, { topicName: topic });
-
         if (response.status === 201) {
-            const topic_id = response.data.topic_id;
-            console.log(`Topic was successfully created, topic Id: ${topic_id} for topic: ${topic}`);
+            const topicId = response.data.topic_id;
+            redisClient.hSet(PROCESSING_TOPICS_KEY, topicId, 0)
+            console.log(`Set topic ${topicId} to 'processing' in Redis.`);
 
-            // Once done processing, update Redis by moving the topic to processed
-            await redisClient.hDel(PROCESSING_TOPICS_KEY, topic);
-            await redisClient.rPush(PROCESSED_TOPICS_KEY, topic);
-
-            // Start querying the status of the topic
-            queryTopicStatus(topic, topic_id);
+            console.log(`ESRGAN microservice started to processing the request, topic Id: ${topicId} for topic: ${topic}`);
         } else {
             console.log(`Failed to create task for topic: ${topic}`);
         }
-
     } catch (error) {
         console.error(`Error creating task for topic: ${topic}`, error);
     }
@@ -147,6 +101,32 @@ const runConsumer = async () => {
     });
 };
 
+// Redis Pub/Sub subscriber to listen for task completion
+async function subscribeToTaskCompletion() {
+    await pubSubClient.connect(); // Ensure connection to Redis Pub/Sub
+
+    await pubSubClient.subscribe(PUB_SUB_CHANNEL, async (message) => {
+        const { topic_id, result } = JSON.parse(message);
+
+        // Update Redis to reflect task completion
+      redisClient.hDel(PROCESSING_TOPICS_KEY, topic_id);
+      console.log(`Removed topic ${topic_id} from processing list in Redis.`);
+
+      // Create the processed topic object in the desired format
+      const processedTopic = JSON.stringify({
+        topic_id: topic_id,
+        result: result
+      });
+
+      redisClient.rPush(PROCESSED_TOPICS_KEY, processedTopic);
+      console.log(`Pushed processed topic to processed list in Redis: ${processedTopic}`);
+
+      console.log(`Task completed for topic: ${topic_id}. Result: ${result}`);
+    });
+
+    console.log(`Subscribed to Redis Pub/Sub channel: ${PUB_SUB_CHANNEL}`);
+}
+
 // Retrieve stored topics from Redis and serve to the frontend
 app.get('/get-status', async (req, res) => {
     const { processed, processing } = await getTopicsFromRedis();
@@ -160,6 +140,8 @@ app.listen(PORT, async () => {
     const { processed, processing } = await getTopicsFromRedis();
     console.log('Restored processed topics from Redis:', processed);
     console.log('Restored processing topics from Redis:', processing);
+
+    runConsumer().catch(console.error);
+    subscribeToTaskCompletion().catch(console.error);
 });
 
-runConsumer().catch(console.error);
