@@ -19,6 +19,11 @@
         <button type="submit">Submit</button>
     </form>
 
+    <form id="uploadForm">
+        <input type="file" id="imageInput" name="image" accept="image/*">
+        <button type="button" id="uploadButton">Upload</button>
+    </form>
+
     <script>
         // Function to fetch processed and processing topics from the server
         function fetchTopics() {
@@ -56,11 +61,13 @@
         // Initial fetch when the page loads
         window.onload = fetchTopics;
 
-        // Handle form submission
-        document.getElementById('submit-task-form').addEventListener('submit', function(event) {
+        function submitTask(imageInput) {
+            console.log(`call submit task`);
+            // Handle form submission
             event.preventDefault();
 
-            const topicName = document.getElementById('topic-name').value;
+            //const topicName = document.getElementById('topic-name').value;
+            const topicName = "UPSCALE";
 
             // Send the topic name to the backend
             fetch('http://localhost:8080/submit-topic', {
@@ -68,20 +75,47 @@
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ topicName }),
+                body: JSON.stringify({ "topicName": topicName, "imageName": imageInput}),
             })
             .then(response => response.json())
             .then(data => {
-                console.log('Task submitted successfully:', data);
+                console.log('Task imageInput submitted successfully:', data);
             })
             .catch(error => {
                 console.error('Error submitting task:', error);
             });
 
-
             // Clear the input field
             document.getElementById('topic-name').value = '';
+        }
+
+        document.getElementById("uploadButton").addEventListener("click", function () {
+        const imageInput = document.getElementById("imageInput");
+        const formData = new FormData();
+
+        if (imageInput.files.length === 0) {
+            alert("Please select an image.");
+            return;
+        }
+
+        formData.append("image", imageInput.files[0]);
+
+        // AJAX request to the server
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/upload-image", true);
+
+        xhr.onload = function (imageInput) {
+            if (xhr.status === 200) {
+            console.log("Image uploaded successfully:", xhr.responseText);
+            submitTask(imageInput);
+            } else {
+            console.error("Image upload failed:", xhr.responseText);
+            }
+        };
+
+        xhr.send(formData);
         });
     </script>
+
 </body>
 </html>
