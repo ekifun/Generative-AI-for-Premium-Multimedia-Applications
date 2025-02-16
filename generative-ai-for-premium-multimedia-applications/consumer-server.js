@@ -61,7 +61,7 @@ async function getTopicsFromRedis() {
 }
 
 // Simulating topic processing
-async function processTopic(topic, imageURL) {
+async function processTopic(topic) {
     // Add the topic to Redis under processing topics with initial progress 0
     await redisClient.hSet(PROCESSING_TOPICS_KEY, topic, 0);
     console.log(`Consumer consumes a topic: ${topic}`);
@@ -69,11 +69,7 @@ async function processTopic(topic, imageURL) {
     try {
         // Send a request to create a new task of super-resolution using generative AI model
         console.log(`Sending POST request to ESRGAN AI model to create a new topic: ${topic}`);
-        const response = await axios.post(`${ESRGANServerUrl}/create_topic`, {
-            topicName: topic,
-            imageURL: imageURL
-        });
-
+        const response = await axios.post(`${ESRGANServerUrl}/create_topic`, { topicName: topic });
         if (response.status === 201) {
             const topicId = response.data.topic_id;
             redisClient.hSet(PROCESSING_TOPICS_KEY, topicId, 0)
@@ -99,8 +95,8 @@ const runConsumer = async () => {
 
     await consumer.run({
         eachMessage: async ({ message }) => {
-            const { topicName, imageURL } = JSON.parse(message.value.toString());
-            processTopic(topicName, imageURL);
+            const topicName = message.value.toString();
+            processTopic(topicName);
         },
     });
 };

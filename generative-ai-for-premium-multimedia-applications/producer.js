@@ -3,7 +3,6 @@ const cors = require('cors'); // Import CORS
 const { Kafka } = require('kafkajs');
 const path = require('path');
 const bodyParser = require('body-parser');
-const multer = require("multer");
 
 const kafka = new Kafka({
     clientId: 'transcoding-service',
@@ -13,8 +12,6 @@ const kafka = new Kafka({
 const producer = kafka.producer();
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-let fileInfo;
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -35,15 +32,12 @@ const startProducer = async () => {
 startProducer();
 
 // Kafka producer logic
-const submitTask = async (topicName, inputName) => {
+const submitTask = async (topicName) => {
     try {
-        imageURL = `http://127.0.0.1:${PORT}/uploads/${fileInfo}`;
-        console.log(`imageURL: ${imageURL}`);
-        const messagePayload = JSON.stringify({ topicName, imageURL });
         await producer.send({
             topic: 'media-transcoding',
             messages: [
-                { value: messagePayload },
+                { value: topicName },
             ],
         });
         console.log(`Task ${topicName} submitted to broker`);
@@ -54,47 +48,16 @@ const submitTask = async (topicName, inputName) => {
 
 // 
 app.post('/submit-topic', async (req, res) => {
-    const { topicName, inputName} = req.body;
+    const { topicName } = req.body;
     console.log(`API to accept user submitted tasks topicName: ${topicName}`);
     
     try {
-        await submitTask(topicName, inputName);
+        await submitTask(topicName);
         res.status(200).json({ message: 'Task submitted successfully', topicName });
     } catch (error) {
         console.error('Error submitting task:', error);
         res.status(500).json({ message: 'Error submitting task', error });
     }
-});
-
-// Configure Multer for file uploads
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, "uploads/"); // Directory to save uploaded files
-    },
-    filename: (req, file, cb) => {
-      const fileName = Date.now() + path.extname(file.originalname);
-      fileInfo = fileName;
-      cb(null, fileName); // Unique file name
-    },
-
-    
-});
-  
-const upload = multer({ storage });
-
-// Serve static files (optional for testing)
-app.use(express.static("public"));
-
-// Endpoint to handle image upload
-app.post("/upload-image", upload.single("image"), (req, res) => {
-    if (!req.file) {
-        return res.status(400).send("No file uploaded.");
-    }
-
-    //fileInfo.set(req.file.originalname, req.file);
-
-    console.log("Uploaded file:", req.file);
-    res.send(`File uploaded successfully: ${req.file.originalname}`);
 });
 
 // 
