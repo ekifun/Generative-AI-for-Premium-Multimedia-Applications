@@ -1,6 +1,5 @@
 flask
-torch==2.0.1+cpu
---extra-index-url https://download.pytorch.org/whl/cpu
+torch
 opencv-python-headless
-numpy
 redis
+numpy<2
