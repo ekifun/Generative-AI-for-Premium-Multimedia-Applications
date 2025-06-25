@@ -47,7 +47,9 @@ services:
     restart: unless-stopped
 
   esrgan:
-    build: ./esrgan-engine
+    build:
+      context: ./esrgan-engine
+      dockerfile: Dockerfile
     ports:
       - "7001:7001"
     volumes:
