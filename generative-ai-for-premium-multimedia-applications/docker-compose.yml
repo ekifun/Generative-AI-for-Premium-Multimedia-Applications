@@ -1,6 +1,8 @@
 services:
   zookeeper:
     image: bitnami/zookeeper:latest
+    environment:
+    - ALLOW_ANONYMOUS_LOGIN=yes
     ports:
       - "2181:2181"
     restart: unless-stopped
