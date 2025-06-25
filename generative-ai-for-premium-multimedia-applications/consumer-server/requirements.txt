@@ -1,0 +1,4 @@
+# consumer/requirements.txt
+kafka-python
+flask
+redis
