@@ -70,14 +70,19 @@ const submitTask = async (topicName) => {
 };
 
 app.post('/submit-topic', async (req, res) => {
-    const { topicName } = req.body;
-    console.log(`📩 Received task submission for topic: ${topicName}`);
-
+    const { topicName, imageURL } = req.body;
+    console.log(`API to accept user submitted tasks: topicName=${topicName}, imageURL=${imageURL}`);
+    
     try {
-        await submitTask(topicName);
-        res.status(200).json({ message: 'Task submitted successfully', topicName });
+        await producer.send({
+            topic: 'media-transcoding',
+            messages: [
+                { value: JSON.stringify({ topicName, imageURL }) }, // Send as JSON
+            ],
+        });
+        res.status(200).json({ message: 'Task submitted successfully', topicName, imageURL });
     } catch (error) {
-        console.error('❌ Error submitting task:', error);
+        console.error('Error submitting task:', error);
         res.status(500).json({ message: 'Error submitting task', error });
     }
 });

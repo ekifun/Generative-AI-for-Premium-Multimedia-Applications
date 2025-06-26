@@ -38,28 +38,27 @@ async function connectRedisClients() {
 }
 
 // === Kafka Message Processor ===
-async function processTopic(topic) {
-    console.log(`📥 Consuming topic from Kafka: ${topic}`);
-
+async function processTopic(topic, imageURL) {
     await redisClient.hSet(PROCESSING_TOPICS_KEY, topic, 0);
+    console.log(`Consumer consumes a topic: ${topic} with imageURL: ${imageURL}`);
 
     try {
-        const imageURL = `https://file-examples.com/storage/fedc186f0a685c3f3a60750/2017/10/file_example_PNG_500kB.png`; // ⬅️ assumes file name = topic + .png
-        const response = await axios.post(`${ESRGANServerUrl}/create_topic`, {
-            topicName: topic,
-            imageURL: imageURL
-        });
+        // Pass imageURL to ESRGAN microservice
+        const response = await axios.post(`${ESRGANServerUrl}/create_topic`, { topicName: topic, imageURL });
 
         if (response.status === 201) {
             const topicId = response.data.topic_id;
             await redisClient.hSet(PROCESSING_TOPICS_KEY, topicId, 0);
-            console.log(`🚀 ESRGAN started processing topicId=${topicId} (from topic="${topic}")`);
+            console.log(`ESRGAN microservice started to process topic: ${topic} (id: ${topicId}) with imageURL: ${imageURL}`);
         } else {
-            console.error(`❌ ESRGAN creation failed for topic: ${topic}`);
+            console.log(`Failed to create task for topic: ${topic}`);
         }
-    } catch (err) {
-        console.error(`❌ Error calling ESRGAN service for topic "${topic}":`, err.message);
+    } catch (error) {
+        console.error(`Error creating task for topic: ${topic}`, error);
     }
+
+    const { processed, processing } = await getTopicsFromRedis();
+    console.log(`Current processing topics: ${JSON.stringify(processing)}, processed topics: ${JSON.stringify(processed)}`);
 }
 
 // === Kafka Consumer Runner ===
@@ -68,11 +67,12 @@ async function runConsumer() {
     await consumer.subscribe({ topic: TOPIC, fromBeginning: true });
 
     await consumer.run({
-        eachMessage: async ({ topic, partition, message }) => {
-            const topicName = message.value.toString();
-            await processTopic(topicName);
-        }
-    });
+        eachMessage: async ({ message }) => {
+            const payload = JSON.parse(message.value.toString());
+            const { topicName, imageURL } = payload;
+            await processTopic(topicName, imageURL);
+        },
+    });    
 
     console.log(`✅ Kafka consumer subscribed to topic "${TOPIC}"`);
 }
