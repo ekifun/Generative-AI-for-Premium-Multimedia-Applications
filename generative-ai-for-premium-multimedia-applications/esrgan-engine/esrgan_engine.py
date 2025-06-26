@@ -95,6 +95,14 @@ def process_image(image_path, topic_id):
     topics[topic_id]["resultPath"] = output_path
     logging.info(f"[{topic_id}] ✅ Upscaled image saved to: {output_path}")
 
+    # 🔔 Publish to Redis channel so consumer can track completion
+    message = json.dumps({
+        "topic_id": topic_id,
+        "result": output_path
+    })
+    redis_client.publish(PUB_SUB_CHANNEL, message)
+    logging.info(f"[{topic_id}] 📡 Published task completion to Redis channel '{PUB_SUB_CHANNEL}'")
+
 # ------------------ Flask Startup ------------------
 
 @app.route('/create_topic', methods=['POST'])
