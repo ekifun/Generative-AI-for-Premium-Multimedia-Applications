@@ -26,12 +26,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(RESULT_DIR, exist_ok=True)
 
 # Redis configuration
-redis_client = redis.Redis(
-    host='redis',  # ✅ Docker service name
-    port=6379,
-    db=0,
-    decode_responses=True
-)
+redis_client = redis.Redis(host='redis', port=6379)
 
 PROCESSING_TOPICS_KEY = "processingTopics"
 PROCESSED_TOPICS_KEY = "processedTopics"
