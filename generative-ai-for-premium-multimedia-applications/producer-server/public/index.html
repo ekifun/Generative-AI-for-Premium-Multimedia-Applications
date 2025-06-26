@@ -15,9 +15,10 @@
     <!-- Add a form for submitting new topics -->
     <h1>Submit New Frame Upscaling Task</h1>
     <form id="submit-task-form">
-        <input type="text" id="topic-name" placeholder="Enter video file name" required>
+        <input type="text" id="topic-name" placeholder="Enter video file name (topicName)" required>
+        <input type="url" id="image-url" placeholder="Enter image URL to upscale" required>
         <button type="submit">Submit</button>
-    </form>
+    </form>    
 
     <script>
         // Function to fetch processed and processing topics from the server
@@ -61,14 +62,15 @@
             event.preventDefault();
 
             const topicName = document.getElementById('topic-name').value;
+            const imageURL = document.getElementById('image-url').value;
 
-            // Send the topic name to the backend
+            // Send the topic name and image URL to the backend
             fetch('/submit-topic', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ topicName }),
+                body: JSON.stringify({ topicName, imageURL }),
             })
             .then(response => response.json())
             .then(data => {
@@ -78,9 +80,9 @@
                 console.error('Error submitting task:', error);
             });
 
-
-            // Clear the input field
+            // Clear the input fields
             document.getElementById('topic-name').value = '';
+            document.getElementById('image-url').value = '';
         });
     </script>
 </body>
