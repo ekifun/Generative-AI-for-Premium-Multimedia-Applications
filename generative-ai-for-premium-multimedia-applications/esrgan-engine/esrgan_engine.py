@@ -9,6 +9,7 @@ import RRDBNet_arch as arch
 import threading
 import time
 import logging
+import requests
 from urllib.parse import urlparse
 
 # Configure logging
@@ -17,24 +18,28 @@ logging.basicConfig(level=logging.INFO)
 # Initialize Flask app
 app = Flask(__name__)
 PORT = int(os.getenv('PORT', 7001))
-UPLOAD_DIR = os.getenv('UPLOAD_DIR', '/app/uploads')  # Folder mounted in Docker
 
-# Initialize Redis client (use Docker hostname for Redis)
+# Upload and results directories (ensure Docker volumes are mounted correctly)
+UPLOAD_DIR = os.getenv('UPLOAD_DIR', '/app/uploads')
+RESULT_DIR = os.getenv('RESULT_DIR', 'results')
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(RESULT_DIR, exist_ok=True)
+
+# Redis configuration
 redis_client = redis.Redis(
-    host='redis',
+    host='localhost',
     port=6379,
     db=0,
     decode_responses=True
 )
-
 PROCESSING_TOPICS_KEY = "processingTopics"
 PROCESSED_TOPICS_KEY = "processedTopics"
 PUB_SUB_CHANNEL = 'task_completed'
 
-# In-memory topic status store
+# Topic status store
 topics = {}
 
-# Model setup
+# ESRGAN model setup
 model_path = 'models/RRDB_ESRGAN_x4.pth'
 device = torch.device('cpu')
 model = arch.RRDBNet(3, 3, 64, 23, gc=32)
@@ -46,9 +51,14 @@ def process_image(image_path, topic_id):
     logging.info(f"[{topic_id}] Processing image: {image_path}")
     topics[topic_id] = {"status": "processing", "progress": 0}
 
-    time.sleep(2)  # Simulate delay
+    time.sleep(2)  # Simulated delay
 
     img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    if img is None:
+        logging.error(f"[{topic_id}] ❌ Failed to read image: {image_path}")
+        topics[topic_id] = {"status": "failed", "error": "Unable to read image."}
+        return
+
     img = img * 1.0 / 255
     img = torch.from_numpy(np.transpose(img[:, :, [2, 1, 0]], (2, 0, 1))).float()
     img_LR = img.unsqueeze(0).to(device)
@@ -58,21 +68,17 @@ def process_image(image_path, topic_id):
 
     output = np.transpose(output[[2, 1, 0], :, :], (1, 2, 0))
     output = (output * 255.0).round()
-    output_path = f"results/{os.path.splitext(os.path.basename(image_path))[0]}_rlt.png"
+    result_path = os.path.join(RESULT_DIR, f'{os.path.splitext(os.path.basename(image_path))[0]}_rlt.png')
+    cv2.imwrite(result_path, output)
 
-    cv2.imwrite(output_path, output)
-    logging.info(f"[{topic_id}] Output saved: {output_path}")
+    logging.info(f"[{topic_id}] ✅ Output saved to: {result_path}")
 
     redis_client.publish(PUB_SUB_CHANNEL, json.dumps({
         "topic_id": topic_id,
         "status": "processed",
-        "result": output_path
+        "result": result_path
     }))
-    topics[topic_id] = {
-        "status": "processed",
-        "progress": 100,
-        "result": output_path
-    }
+    topics[topic_id] = {"status": "processed", "progress": 100, "result": result_path}
 
 @app.route('/create_topic', methods=['POST'])
 def create_topic():
@@ -87,14 +93,29 @@ def create_topic():
     filename = os.path.basename(parsed_url.path)
     image_path = os.path.join(UPLOAD_DIR, filename)
 
+    # Download the image from the URL
+    try:
+        response = requests.get(image_url, timeout=10)
+        if response.status_code != 200:
+            return jsonify({"error": f"Failed to download image: status={response.status_code}"}), 400
+
+        with open(image_path, 'wb') as f:
+            f.write(response.content)
+
+        logging.info(f"[create_topic] ✅ Downloaded image to: {image_path}")
+    except Exception as e:
+        logging.error(f"[create_topic] ❌ Exception while downloading image: {e}")
+        return jsonify({"error": "Image download failed", "details": str(e)}), 400
+
     topic_id = str(len(topics) + 1)
     topics[topic_id] = {
         "status": "created",
         "topicName": topic_name,
-        "imageURL": image_url
+        "imageURL": image_url,
+        "imagePath": image_path
     }
 
-    logging.info(f"[{topic_id}] Starting async processing for image: {image_path}")
+    logging.info(f"[create_topic] Starting thread for: {image_path}")
     threading.Thread(target=process_image, args=(image_path, topic_id)).start()
 
     return jsonify({"topic_id": topic_id}), 201
