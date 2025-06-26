@@ -87,3 +87,57 @@ def process_image(image_path, topic_id):
 
     output = np.transpose(output[[2, 1, 0], :, :], (1, 2, 0))
     output = (output * 255.0).round()
+
+# ------------------ Flask Startup ------------------
+
+@app.route('/create_topic', methods=['POST'])
+def create_topic():
+    data = request.json
+    topic_name = data.get("topicName")
+    image_url = data.get("imageURL")
+
+    if not topic_name or not image_url:
+        return jsonify({"error": "Both topicName and imageURL are required."}), 400
+
+    parsed_url = urlparse(image_url)
+    filename = os.path.basename(parsed_url.path)
+    image_path = os.path.join(UPLOAD_DIR, filename)
+
+    # Download image
+    try:
+        response = requests.get(image_url, timeout=10)
+        if response.status_code != 200:
+            return jsonify({"error": f"Failed to download image, status={response.status_code}"}), 400
+
+        with open(image_path, 'wb') as f:
+            f.write(response.content)
+        logging.info(f"[{topic_name}] ✅ Image downloaded to: {image_path}")
+    except Exception as e:
+        logging.error(f"[{topic_name}] ❌ Failed to download image: {e}")
+        return jsonify({"error": "Image download failed", "details": str(e)}), 400
+
+    topic_id = str(len(topics) + 1)
+    topics[topic_id] = {
+        "status": "created",
+        "topicName": topic_name,
+        "imageURL": image_url,
+        "imagePath": image_path
+    }
+
+    threading.Thread(target=process_image, args=(image_path, topic_id)).start()
+    return jsonify({"topic_id": topic_id}), 201
+
+@app.route('/get_topic/<topic_id>', methods=['GET'])
+def get_topic(topic_id):
+    return jsonify(topics.get(topic_id, {"error": "Topic not found"})), 200 if topic_id in topics else 404
+
+@app.route('/close_topic/<topic_id>', methods=['POST'])
+def close_topic(topic_id):
+    if topic_id in topics:
+        del topics[topic_id]
+        return jsonify({"message": "Topic closed"}), 200
+    return jsonify({"error": "Topic not found"}), 404
+
+# Run Flask app
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=PORT)
