@@ -25,8 +25,8 @@ const kafka = new Kafka({ clientId: 'transcoding-service', brokers: KAFKA_BROKER
 const consumer = kafka.consumer({ groupId: GROUP_ID });
 
 // === Redis Setup ===
-const redisClient = redis.createClient();
-const pubSubClient = redisClient.duplicate(); // Separate Redis connection for Pub/Sub
+const redisClient = redis.createClient({ url: 'redis://redis:6379' });
+const pubSubClient = redis.createClient({ url: 'redis://redis:6379' });
 
 redisClient.on('error', (err) => console.error('Redis error:', err));
 pubSubClient.on('error', (err) => console.error('Redis Pub/Sub error:', err));
