@@ -44,7 +44,11 @@ async function processTopic(topic) {
     await redisClient.hSet(PROCESSING_TOPICS_KEY, topic, 0);
 
     try {
-        const response = await axios.post(`${ESRGANServerUrl}/create_topic`, { topicName: topic });
+        const imageURL = `https://file-examples.com/storage/fedc186f0a685c3f3a60750/2017/10/file_example_PNG_500kB.png`; // ⬅️ assumes file name = topic + .png
+        const response = await axios.post(`${ESRGANServerUrl}/create_topic`, {
+            topicName: topic,
+            imageURL: imageURL
+        });
 
         if (response.status === 201) {
             const topicId = response.data.topic_id;
