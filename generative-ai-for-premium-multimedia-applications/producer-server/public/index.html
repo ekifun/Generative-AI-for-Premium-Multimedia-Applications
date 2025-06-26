@@ -22,7 +22,7 @@
     <script>
         // Function to fetch processed and processing topics from the server
         function fetchTopics() {
-            fetch('http://localhost:8080/get-status')
+            fetch('/get-status')  // ✅ Automatically resolved to the producer host
                 .then(response => response.json())
                 .then(data => {
                     const processedTopics = document.getElementById('processed-topics');
@@ -63,7 +63,7 @@
             const topicName = document.getElementById('topic-name').value;
 
             // Send the topic name to the backend
-            fetch('http://localhost:8080/submit-topic', {
+            fetch('/submit-topic', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
