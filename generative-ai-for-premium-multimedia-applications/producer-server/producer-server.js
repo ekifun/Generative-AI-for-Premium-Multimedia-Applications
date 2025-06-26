@@ -15,9 +15,9 @@ app.use(bodyParser.json());
 
 // === Kafka Setup ===
 const kafka = new Kafka({
-    clientId: 'transcoding-service',
-    brokers: ['127.0.0.1:9092']
-});
+    clientId: 'producer-service',
+    brokers: ['kafka:9092']  // ✅ MUST be this inside Docker network
+  });  
 
 const producer = kafka.producer();
 
@@ -104,6 +104,10 @@ app.get('/get-status', async (req, res) => {
         console.error('❌ Error fetching status:', error);
         res.status(500).json({ message: 'Error fetching status', error });
     }
+});
+
+app.get('/', (req, res) => {
+    res.send('Producer service is running.');
 });
 
 // === Shutdown Handler ===
