@@ -22,7 +22,12 @@ const kafka = new Kafka({
 const producer = kafka.producer();
 
 // === Redis Setup ===
-const redisClient = redis.createClient();
+const redisClient = redis.createClient({
+    socket: {
+        host: 'redis',   // use Docker service name, NOT 'localhost'
+        port: 6379
+    }
+});
 
 const PROCESSING_TOPICS_KEY = 'processingTopics';
 const PROCESSED_TOPICS_KEY = 'processedTopics';
@@ -32,11 +37,12 @@ redisClient.on('error', (err) => {
 });
 
 redisClient.connect()
-.then(() => console.log('Connected to Redis'))
-.catch(err => {
-    console.error('Could not connect to Redis:', err);
-    process.exit(1);
-});
+    .then(() => console.log('✅ Connected to Redis'))
+    .catch(err => {
+        console.error('❌ Could not connect to Redis:', err);
+        process.exit(1);
+    });
+
 
 // === Kafka Producer Start ===
 const startProducer = async () => {
