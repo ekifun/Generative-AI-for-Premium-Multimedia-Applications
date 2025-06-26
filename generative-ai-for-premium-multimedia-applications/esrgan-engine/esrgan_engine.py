@@ -61,7 +61,6 @@ except Exception as e:
     raise
 
 # ------------------ Image Processing ------------------
-
 def process_image(image_path, topic_id):
     logging.info(f"[{topic_id}] ▶️ Processing image: {image_path}")
     topics[topic_id] = {"status": "processing", "progress": 0}
@@ -87,6 +86,14 @@ def process_image(image_path, topic_id):
 
     output = np.transpose(output[[2, 1, 0], :, :], (1, 2, 0))
     output = (output * 255.0).round()
+
+    # ✅ Save upscaled result
+    output_path = os.path.join(RESULT_DIR, f"{topic_id}_upscaled.png")
+    cv2.imwrite(output_path, output.astype(np.uint8))
+
+    topics[topic_id]["status"] = "completed"
+    topics[topic_id]["resultPath"] = output_path
+    logging.info(f"[{topic_id}] ✅ Upscaled image saved to: {output_path}")
 
 # ------------------ Flask Startup ------------------
 
