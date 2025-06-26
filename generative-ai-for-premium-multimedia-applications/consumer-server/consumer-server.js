@@ -37,6 +37,18 @@ async function connectRedisClients() {
     console.log('✅ Connected to Redis');
 }
 
+async function getTopicsFromRedis() {
+    const processed = await redisClient.lRange(PROCESSED_TOPICS_KEY, 0, -1);
+    const processing = await redisClient.hGetAll(PROCESSING_TOPICS_KEY);
+    return {
+        processed: processed.map(topic => JSON.parse(topic)),
+        processing: Object.keys(processing).map(key => ({
+            name: key,
+            progress: processing[key],
+        }))
+    };
+}
+
 // === Kafka Message Processor ===
 async function processTopic(topic, imageURL) {
     await redisClient.hSet(PROCESSING_TOPICS_KEY, topic, 0);
