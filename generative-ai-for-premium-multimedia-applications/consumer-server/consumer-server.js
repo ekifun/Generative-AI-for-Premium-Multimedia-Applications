@@ -7,10 +7,10 @@ const redis = require('redis');
 
 // === Constants ===
 const PORT = 5001;
-const KAFKA_BROKERS = ['127.0.0.1:9092'];
+const KAFKA_BROKERS = ['kafka:9092'];
 const TOPIC = 'media-transcoding';
 const GROUP_ID = 'transcoding-group';
-const ESRGANServerUrl = 'http://127.0.0.1:7001';
+const ESRGANServerUrl = 'http://esrgan:7001';
 const PROCESSING_TOPICS_KEY = 'processingTopics';
 const PROCESSED_TOPICS_KEY = 'processedTopics';
 const PUB_SUB_CHANNEL = 'task_completed';
