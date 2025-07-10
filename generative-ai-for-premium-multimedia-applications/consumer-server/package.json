@@ -1,0 +1,13 @@
+{
+    "name": "consumer-server",
+    "version": "1.0.0",
+    "main": "consumer-server.js",
+    "dependencies": {
+      "express": "^4.18.2",
+      "cors": "^2.8.5",
+      "kafkajs": "^2.2.4",
+      "axios": "^1.6.8",
+      "redis": "^4.6.7"
+    }
+  }
+  

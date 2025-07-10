@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Immersive Media Transcoding Dashboard</title>
+</head>
+<body>
+    <h1>Processed Topics</h1>
+    <ul id="processed-topics"></ul>
+
+    <h1>Processing Topics</h1>
+    <ul id="processing-topics"></ul>
+
+    <!-- Add a form for submitting new topics -->
+    <h1>Submit New Frame Upscaling Task</h1>
+    <form id="submit-task-form">
+        <input type="text" id="topic-name" placeholder="Enter video file name (topicName)" required>
+        <input type="url" id="image-url" placeholder="Enter image URL to upscale" required>
+        <button type="submit">Submit</button>
+    </form>    
+
+    <script>
+        // Function to fetch processed and processing topics from the server
+        function fetchTopics() {
+            fetch('/get-status')  // ✅ Automatically resolved to the producer host
+                .then(response => response.json())
+                .then(data => {
+                    const processedTopics = document.getElementById('processed-topics');
+                    const processingTopics = document.getElementById('processing-topics');
+                    
+                    // Clear the current list
+                    processedTopics.innerHTML = '';
+                    processingTopics.innerHTML = '';
+
+                    // Render processed topics
+                    data.processed.forEach(topic => {
+                        console.log(`processed topic: ${topic}`);
+                        const li = document.createElement('li');
+                        li.textContent = topic.name;
+                        processedTopics.appendChild(li);
+                    });
+
+                    // Render processing topics with progress
+                    data.processing.forEach(topic => {
+                        console.log(`processing topic: ${topic}`);
+                        const li = document.createElement('li');
+                        li.textContent = `${topic.name} - Progress: ${topic.progress}%`;
+                        processingTopics.appendChild(li);
+                    });
+                });
+        }
+
+        // Fetch topics every 5 seconds to keep the lists updated
+        setInterval(fetchTopics, 5000);
+
+        // Initial fetch when the page loads
+        window.onload = fetchTopics;
+
+        // Handle form submission
+        document.getElementById('submit-task-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const topicName = document.getElementById('topic-name').value;
+            const imageURL = document.getElementById('image-url').value;
+
+            // Send the topic name and image URL to the backend
+            fetch('/submit-topic', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ topicName, imageURL }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Task submitted successfully:', data);
+            })
+            .catch(error => {
+                console.error('Error submitting task:', error);
+            });
+
+            // Clear the input fields
+            document.getElementById('topic-name').value = '';
+            document.getElementById('image-url').value = '';
+        });
+    </script>
+</body>
+</html>
