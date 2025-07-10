@@ -1,4 +1,8 @@
 # Generative-AI-for-Premium-Multimedia-Applications
+
+🌐 [Live Demo](https://ekifun.github.io/Generative-AI-for-Premium-Multimedia-Applications/)  
+📂 [Source Code](https://github.com/ekifun/Generative-AI-for-Premium-Multimedia-Applications)
+
 ### 1. Frontend (index.html):
 - Displays the processed and processing topics (media tasks).
 - Allows users to submit new tasks through a form.
